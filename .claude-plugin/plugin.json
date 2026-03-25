@@ -1,0 +1,10 @@
+{
+  "name": "wrenai-mcp",
+  "description": "Connect Claude to WrenAI — query data, generate SQL, build charts, and get business insights via MCP",
+  "version": "1.0.0",
+  "agents": [],
+  "skills": [
+    "./skills/setup-wrenai-mcp",
+    "./skills/wrenai-analyst"
+  ]
+}
