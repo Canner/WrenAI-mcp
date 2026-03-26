@@ -1,0 +1,11 @@
+allowed-tools:
+  - mcp__wrenai__get_project_metadata
+  - mcp__wrenai__ask
+  - mcp__wrenai__generate_sql
+  - mcp__wrenai__run_sql
+  - mcp__wrenai__generate_chart
+  - mcp__wrenai__generate_summary
+  - Read
+  - Write
+  - Bash
+  - AskUserQuestion

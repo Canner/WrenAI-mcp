@@ -1,0 +1,9 @@
+# Generated platform-specific skills (regenerate with ./setup)
+.agents/
+web/
+
+# Local MCP config (use `claude mcp add` instead)
+.mcp.json
+
+# Local debug scripts
+run-mcp-remote.sh

@@ -17,8 +17,12 @@ allowed-tools:
   - mcp__wrenai__generate_chart
   - mcp__wrenai__generate_summary
   - Read
+  - Write
+  - Bash
   - AskUserQuestion
 ---
+
+<!-- AUTO-GENERATED from SKILL.md.tmpl for claude — do not edit directly -->
 
 # WrenAI Data Analyst
 
@@ -134,7 +138,59 @@ If the user provided a question, use it. Otherwise ask what they want to know.
 **What this means:** [2-3 sentences of business interpretation]
 ```
 
-If a chart is returned, display it inline.
+If `generate_chart` returns a **VegaSpec** (Vega-Lite JSON), render it as a standalone HTML file:
+
+#### Chart Rendering Workflow
+
+1. **Extract the VegaSpec** from the `generate_chart` response (the JSON spec object).
+2. **Apply frontend-design aesthetics** — enhance the VegaSpec before rendering:
+   - Choose a **bold, distinctive color scheme** — avoid generic blue/grey. Commit to a palette that matches the data story (e.g., warm tones for revenue, cool tones for user metrics, high-contrast for comparisons).
+   - Use **refined typography** — set `config.title.font`, `config.axis.labelFont`, `config.legend.labelFont` to distinctive, beautiful fonts loaded from Google Fonts (e.g., "DM Sans", "Space Mono", "Playfair Display", "Outfit"). Never use default Vega fonts.
+   - Tune **spacing and layout** — generous padding, clean axis labels, meaningful titles.
+   - Add **subtle background** or gradient to the page (not the chart) for atmosphere.
+   - Keep the chart itself clean and data-focused — let the page design provide the personality.
+3. **Write an HTML file** to `/tmp/wrenai-chart-{timestamp}.html` with:
+   - Vega-Lite embed via CDN (`vega`, `vega-lite`, `vega-embed`)
+   - Google Fonts loaded for the chosen typography
+   - A styled container with the chart title, subtitle (the question asked), and the Vega-Lite visualization
+   - Responsive layout that looks great at any size
+   - The VegaSpec inlined as JSON, rendered with `vegaEmbed`
+4. **Open the file** in the browser with `open /tmp/wrenai-chart-{timestamp}.html`.
+5. **Tell the user** the chart is open and provide a 1-sentence description of what it shows.
+
+**HTML template structure:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{chart title}</title>
+  <link href="https://fonts.googleapis.com/css2?family={chosen fonts}&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <style>
+    /* Bold, distinctive page styling — NOT generic white background */
+    /* Match the aesthetic to the data story */
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>{insight title}</h1>
+    <p class="subtitle">{the question}</p>
+    <div id="chart"></div>
+    <p class="caption">{1-sentence data insight}</p>
+  </div>
+  <script>
+    const spec = { /* VegaSpec JSON with enhanced config */ };
+    vegaEmbed('#chart', spec, { actions: false, renderer: 'svg' });
+  </script>
+</body>
+</html>
+```
+
+**IMPORTANT**: Every chart should look **unique and intentionally designed** — vary colors, fonts, and page styling per chart. Never produce two charts that look the same.
 
 ### Step 5 — Follow-up
 

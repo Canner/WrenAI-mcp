@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# wrenai-mcp setup — generate platform-specific skills and install them
+set -e
+
+SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ─── Parse --host flag ─────────────────────────────────────────
+HOST="claude"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) [ -z "$2" ] && echo "Missing value for --host (expected claude, codex, kiro, chatgpt, web, or auto)" >&2 && exit 1; HOST="$2"; shift 2 ;;
+    --host=*) HOST="${1#--host=}"; shift ;;
+    *) shift ;;
+  esac
+done
+
+case "$HOST" in
+  claude|codex|kiro|chatgpt|web|auto) ;;
+  *) echo "Unknown --host value: $HOST (expected claude, codex, kiro, chatgpt, web, or auto)" >&2; exit 1 ;;
+esac
+
+# ─── Auto-detect installed agents ──────────────────────────────
+INSTALL_CLAUDE=0
+INSTALL_CODEX=0
+INSTALL_KIRO=0
+INSTALL_CHATGPT=0
+INSTALL_WEB=0
+
+if [ "$HOST" = "auto" ]; then
+  command -v claude >/dev/null 2>&1 && INSTALL_CLAUDE=1
+  command -v codex >/dev/null 2>&1 && INSTALL_CODEX=1
+  command -v kiro-cli >/dev/null 2>&1 && INSTALL_KIRO=1
+  if [ "$INSTALL_CLAUDE" -eq 0 ] && [ "$INSTALL_CODEX" -eq 0 ] && [ "$INSTALL_KIRO" -eq 0 ]; then
+    INSTALL_CLAUDE=1
+  fi
+  # Always generate web + chatgpt skills in auto mode
+  INSTALL_WEB=1
+  INSTALL_CHATGPT=1
+elif [ "$HOST" = "claude" ]; then
+  INSTALL_CLAUDE=1
+elif [ "$HOST" = "codex" ]; then
+  INSTALL_CODEX=1
+elif [ "$HOST" = "kiro" ]; then
+  INSTALL_KIRO=1
+elif [ "$HOST" = "chatgpt" ]; then
+  INSTALL_CHATGPT=1
+elif [ "$HOST" = "web" ]; then
+  INSTALL_WEB=1
+fi
+
+# ─── Template fragments directory ──────────────────────────────
+FRAGMENTS_DIR="$SOURCE_DIR/fragments"
+
+# ─── Template engine ───────────────────────────────────────────
+# Resolves {{PLACEHOLDER}} in .tmpl files using fragment files per host.
+
+generate_skill() {
+  local tmpl_file="$1"
+  local output_file="$2"
+  local host="$3"
+
+  local host_dir="$FRAGMENTS_DIR/$host"
+
+  # Start with the template
+  local tmpfile
+  tmpfile=$(mktemp)
+  cp "$tmpl_file" "$tmpfile"
+
+  # Simple single-line replacements via sed
+  # (read from the host's simple.vars file: KEY=VALUE per line)
+  if [ -f "$host_dir/simple.vars" ]; then
+    while IFS='=' read -r key value; do
+      [ -z "$key" ] && continue
+      [[ "$key" == \#* ]] && continue
+      sed -i '' "s|{{${key}}}|${value}|g" "$tmpfile"
+    done < "$host_dir/simple.vars"
+  fi
+
+  # Multi-line replacements via awk
+  # For each {{PLACEHOLDER}}, look for a file named PLACEHOLDER.md in the host dir
+  local placeholders
+  placeholders=$(grep -oE '\{\{[A-Z_]+\}\}' "$tmpfile" 2>/dev/null | sort -u || true)
+
+  for placeholder in $placeholders; do
+    local name="${placeholder//\{/}"
+    name="${name//\}/}"
+    local frag_file="$host_dir/${name}.md"
+
+    if [ -f "$frag_file" ]; then
+      # Replace the placeholder line with fragment file contents
+      awk -v placeholder="{{${name}}}" -v file="$frag_file" '
+        index($0, placeholder) {
+          while ((getline line < file) > 0) print line
+          close(file)
+          next
+        }
+        { print }
+      ' "$tmpfile" > "${tmpfile}.new"
+      mv "${tmpfile}.new" "$tmpfile"
+    else
+      # Remove unreplaced placeholder (empty replacement)
+      sed -i '' "s|{{${name}}}||g" "$tmpfile"
+    fi
+  done
+
+  # Write output
+  mkdir -p "$(dirname "$output_file")"
+  # YAML frontmatter must start on line 1 (---). Put the auto-gen comment
+  # after the frontmatter closing --- so it doesn't break parsers.
+  awk -v comment="<!-- AUTO-GENERATED from $(basename "$tmpl_file") for $host — do not edit directly -->" '
+    BEGIN { front_count=0; inserted=0 }
+    /^---$/ {
+      print
+      front_count++
+      if (front_count == 2 && !inserted) {
+        print ""
+        print comment
+        inserted=1
+      }
+      next
+    }
+    { print }
+  ' "$tmpfile" > "$output_file"
+
+  rm -f "$tmpfile"
+}
+
+# Generate a clean skill content file (no YAML frontmatter, no auto-gen comment)
+# for claude.ai and Claude Desktop skill creation UI.
+generate_skill_content() {
+  local tmpl_file="$1"
+  local output_file="$2"
+  local host="$3"
+
+  # First generate the full SKILL.md
+  local tmpfull
+  tmpfull=$(mktemp)
+  generate_skill "$tmpl_file" "$tmpfull" "$host"
+
+  # Strip the auto-generated comment and YAML frontmatter (everything between --- ... ---)
+  awk '
+    BEGIN { in_front=0; stripped=0; skip_blank=1 }
+    /^<!-- AUTO-GENERATED/ { next }
+    /^---$/ && stripped==0 { in_front=!in_front; if(!in_front) { stripped=1 }; next }
+    in_front { next }
+    skip_blank && /^$/ { next }
+    { skip_blank=0; print }
+  ' "$tmpfull" > "$output_file"
+
+  rm -f "$tmpfull"
+}
+
+# ─── Generate & install for Claude ─────────────────────────────
+if [ "$INSTALL_CLAUDE" -eq 1 ]; then
+  echo "Generating skills for Claude..."
+
+  generate_skill \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md.tmpl" \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md" \
+    claude
+
+  generate_skill \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md.tmpl" \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md" \
+    claude
+
+  echo "wrenai-mcp ready (claude)."
+  echo "  Install as plugin: add this repo path to your Claude Code plugins"
+  echo "  Or symlink: ln -snf $SOURCE_DIR/skills/* ~/.claude/skills/"
+fi
+
+# ─── Generate & install for Codex ──────────────────────────────
+if [ "$INSTALL_CODEX" -eq 1 ]; then
+  echo "Generating skills for Codex..."
+
+  AGENTS_DIR="$SOURCE_DIR/.agents/skills"
+  mkdir -p "$AGENTS_DIR/wrenai-analyst" "$AGENTS_DIR/wrenai-setup"
+
+  generate_skill \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md.tmpl" \
+    "$AGENTS_DIR/wrenai-analyst/SKILL.md" \
+    codex
+
+  generate_skill \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md.tmpl" \
+    "$AGENTS_DIR/wrenai-setup/SKILL.md" \
+    codex
+
+  # Install to user-global ~/.codex/skills/ if not repo-local
+  CODEX_SKILLS="$HOME/.codex/skills"
+  INSTALL_PARENT="$(basename "$(dirname "$SOURCE_DIR")")"
+  if [ "$INSTALL_PARENT" != ".agents" ]; then
+    mkdir -p "$CODEX_SKILLS"
+    for skill_dir in "$AGENTS_DIR"/wrenai-*/; do
+      [ -d "$skill_dir" ] || continue
+      skill_name="$(basename "$skill_dir")"
+      target="$CODEX_SKILLS/$skill_name"
+      if [ -L "$target" ] || [ ! -e "$target" ]; then
+        ln -snf "$skill_dir" "$target"
+      fi
+    done
+  fi
+
+  echo "wrenai-mcp ready (codex)."
+  echo "  skills: $AGENTS_DIR"
+fi
+
+# ─── Generate & install for Kiro ───────────────────────────────
+if [ "$INSTALL_KIRO" -eq 1 ]; then
+  echo "Generating skills for Kiro..."
+
+  KIRO_SKILLS="$HOME/.kiro/skills"
+  mkdir -p "$KIRO_SKILLS/wrenai-analyst" "$KIRO_SKILLS/wrenai-setup"
+
+  generate_skill \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md.tmpl" \
+    "$KIRO_SKILLS/wrenai-analyst/SKILL.md" \
+    kiro
+
+  generate_skill \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md.tmpl" \
+    "$KIRO_SKILLS/wrenai-setup/SKILL.md" \
+    kiro
+
+  echo "wrenai-mcp ready (kiro)."
+  echo "  skills: $KIRO_SKILLS"
+fi
+
+# ─── Generate for ChatGPT ──────────────────────────────────────
+if [ "$INSTALL_CHATGPT" -eq 1 ]; then
+  echo "Generating skill content for ChatGPT..."
+
+  CHATGPT_DIR="$SOURCE_DIR/web/chatgpt"
+  mkdir -p "$CHATGPT_DIR"
+
+  generate_skill_content \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md.tmpl" \
+    "$CHATGPT_DIR/wrenai-analyst-skill.md" \
+    chatgpt
+
+  generate_skill_content \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md.tmpl" \
+    "$CHATGPT_DIR/wrenai-setup-skill.md" \
+    chatgpt
+
+  echo "wrenai-mcp ready (chatgpt)."
+  echo "  Copy the content of these files into ChatGPT Skills editor:"
+  echo "  - $CHATGPT_DIR/wrenai-analyst-skill.md"
+  echo "  - $CHATGPT_DIR/wrenai-setup-skill.md"
+fi
+
+# ─── Generate for Web (claude.ai / Claude Desktop) ────────────
+if [ "$INSTALL_WEB" -eq 1 ]; then
+  echo "Generating skills for claude.ai / Claude Desktop..."
+
+  # claude.ai upload requires SKILL.md with YAML frontmatter (name + description).
+  # The web fragments have no ALLOWED_TOOLS.md, so generate_skill already produces
+  # a clean SKILL.md without allowed-tools. Output as SKILL.md so it can be
+  # uploaded directly or zipped.
+
+  WEB_ANALYST_DIR="$SOURCE_DIR/web/claude/wrenai-analyst"
+  WEB_SETUP_DIR="$SOURCE_DIR/web/claude/wrenai-setup"
+  mkdir -p "$WEB_ANALYST_DIR" "$WEB_SETUP_DIR"
+
+  generate_skill \
+    "$SOURCE_DIR/skills/wrenai-analyst/SKILL.md.tmpl" \
+    "$WEB_ANALYST_DIR/SKILL.md" \
+    web
+
+  generate_skill \
+    "$SOURCE_DIR/skills/setup-wrenai-mcp/SKILL.md.tmpl" \
+    "$WEB_SETUP_DIR/SKILL.md" \
+    web
+
+  echo "wrenai-mcp ready (claude.ai / Claude Desktop)."
+  echo "  Upload these SKILL.md files in claude.ai (Settings → Skills → Upload):"
+  echo "  - $WEB_ANALYST_DIR/SKILL.md"
+  echo "  - $WEB_SETUP_DIR/SKILL.md"
+fi
+
+echo "Done."
