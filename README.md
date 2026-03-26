@@ -16,7 +16,8 @@ AI Agent ←→ MCP ←→ WrenAI Server
 
 - A running WrenAI instance with MCP enabled
 - **Web platforms** (claude.ai, ChatGPT): just your WrenAI account (OAuth login)
-- **CLI / code editors** (Claude Code, Claude Desktop, Codex, Kiro): Node.js >= 18 for the `mcp-remote` bridge + API key or local dev mode (`MCP_SKIP_AUTH=true`)
+- **CLI / code editors** (Claude Code, Claude Desktop): Node.js >= 20 for the stdio proxy + API key or local dev mode (`MCP_SKIP_AUTH=true`)
+- **Other CLI** (Codex, Kiro): Node.js >= 18 for the `mcp-remote` bridge + API key
 
 ---
 
@@ -24,18 +25,36 @@ AI Agent ←→ MCP ←→ WrenAI Server
 
 ### 1. Claude Code (CLI)
 
-> **Note:** Claude Code's native HTTP transport has a [known bug (#29688)](https://github.com/anthropics/claude-code/issues/29688).
-> Use the stdio bridge workaround below until it's fixed.
+> **Note:** Claude Code's HTTP transport auto-discovers OAuth and hangs if the server
+> advertises `/.well-known/oauth-authorization-server`. The stdio proxy bypasses this.
 
 ```bash
-# Step 1: Add MCP server (stdio bridge with API key)
-claude mcp add --transport stdio --scope project wrenai -- \
-  npx mcp-remote https://app.getwren.ai/api/mcp/{your_project_id} \
-  --header "Authorization: Bearer {your_api_key}"
+# Step 1: Clone the plugin
+git clone https://github.com/canner/wrenai-mcp.git
+cd wrenai-mcp
 
-# Step 2: Restart Claude Code
+# Step 2: Add MCP server (stdio proxy with API key)
+#   Replace {node_path} with your Node.js >= 20 binary (e.g. ~/.nvm/versions/node/v20.20.1/bin/node)
+#   Replace {your_project_id} and {your_api_key} with your WrenAI credentials
+cat > .mcp.json << 'EOF'
+{
+  "mcpServers": {
+    "wrenai": {
+      "type": "stdio",
+      "command": "{node_path}",
+      "args": [
+        "{absolute_path_to_repo}/mcp-proxy.mjs",
+        "https://app.getwren.ai/api/mcp/{your_project_id}",
+        "{your_api_key}"
+      ]
+    }
+  }
+}
+EOF
 
-# Step 3 (optional): Install the data analyst skill plugin
+# Step 3: Restart Claude Code
+
+# Step 4 (optional): Install the data analyst skill plugin
 /install canner/wrenai-mcp
 ```
 
@@ -67,9 +86,11 @@ Add MCP connector + create skill. Auth is handled via OAuth.
 
 ### 3. Claude Desktop
 
-**2 steps.** Edit MCP config + add skill to project. Uses `mcp-remote` as a stdio-to-HTTP bridge.
+**2 steps.** Edit MCP config + add skill to project. Uses the stdio proxy to bypass OAuth discovery.
 
 **Step 1 — Add MCP Server:**
+
+Clone the plugin: `git clone https://github.com/canner/wrenai-mcp.git`
 
 Edit `claude_desktop_config.json`:
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -79,17 +100,16 @@ Edit `claude_desktop_config.json`:
 {
   "mcpServers": {
     "wrenai": {
-      "command": "npx",
+      "command": "{node_path}",
       "args": [
-        "mcp-remote",
-        "{mcp_url}"
+        "{absolute_path_to_repo}/mcp-proxy.mjs",
+        "https://app.getwren.ai/api/mcp/{your_project_id}",
+        "{your_api_key}"
       ]
     }
   }
 }
 ```
-
-On first connection, `mcp-remote` opens a browser for OAuth login. Credentials are cached for subsequent sessions.
 
 **Step 2 — Add Skill:**
 
@@ -193,9 +213,9 @@ cd ~/wrenai-mcp && ./setup --host kiro
 
 | Platform | MCP Setup | Skill Setup | Steps |
 |----------|-----------|-------------|-------|
-| **Claude Code** | `claude mcp add` (stdio bridge + API key) | Plugin: `/install canner/wrenai-mcp` | 2 |
+| **Claude Code** | `.mcp.json` (stdio proxy + API key) | Plugin: `/install canner/wrenai-mcp` | 3 |
 | **claude.ai** | Connectors UI (OAuth) | Skills UI (paste content) | 2 |
-| **Claude Desktop** | Edit `claude_desktop_config.json` | Project Custom Instructions | 2 |
+| **Claude Desktop** | Edit `claude_desktop_config.json` (stdio proxy) | Project Knowledge | 2 |
 | **ChatGPT** | Developer Mode → Add MCP Connector | Custom Instructions (paste content) | 2 |
 | **Codex** | Edit `codex.json` | `git clone` + `./setup --host codex` | 2 |
 | **Kiro** | Edit `.kiro/settings/mcp.json` | `git clone` + `./setup --host kiro` | 2 |
@@ -205,9 +225,9 @@ cd ~/wrenai-mcp && ./setup --host kiro
 Let teammates use the skills without installing:
 
 ```bash
-# For Claude Code
-cp -Rf ~/.claude/skills/wrenai-mcp .claude/skills/wrenai-mcp
-rm -rf .claude/skills/wrenai-mcp/.git
+# For Claude Code — clone into project and configure .mcp.json
+git clone https://github.com/canner/wrenai-mcp.git .claude/plugins/wrenai-mcp
+# Then add the .mcp.json config as shown in section 1 above
 
 # For Codex / Cursor
 git clone https://github.com/canner/wrenai-mcp.git .agents/skills/wrenai-mcp

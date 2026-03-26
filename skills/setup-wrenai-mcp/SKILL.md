@@ -1,6 +1,6 @@
 ---
 name: setup-wrenai-mcp
-description: "Set up WrenAI MCP server connection. Detects Node.js, installs mcp-remote bridge, configures .mcp.json, and verifies the connection. Triggers on 'connect to wrenai', 'setup wrenai mcp', 'connect mcp', or 'wrenai mcp setup'."
+description: "Set up WrenAI MCP server connection. Detects Node.js, configures .mcp.json with stdio proxy, and verifies the connection. Triggers on 'connect to wrenai', 'setup wrenai mcp', 'connect mcp', or 'wrenai mcp setup'."
 ---
 
 <!-- AUTO-GENERATED from SKILL.md.tmpl for claude — do not edit directly -->
@@ -34,60 +34,99 @@ Construct the MCP endpoint: `{url}/api/mcp/{project_id}`
 
 ### Step 2 — Check Node.js >= 20
 
-The `mcp-remote` bridge requires Node.js >= 20. Find a suitable binary:
+The stdio proxy requires Node.js >= 20 (for native `https` module ESM support). Find a suitable `node` binary:
 
 ```bash
 node --version
 ```
 
 If not found or version < 20, search common locations:
-- `~/.nvm/versions/node/v2*/bin/npx`
-- `~/.volta/bin/npx`
-- `/usr/local/bin/npx`
-- `/opt/homebrew/bin/npx`
+- `~/.nvm/versions/node/v2*/bin/node`
+- `~/.volta/bin/node`
+- `/usr/local/bin/node`
+- `/opt/homebrew/bin/node`
 
 If no Node.js >= 20 found, offer to install:
-> You need Node.js >= 20 for the MCP bridge.
+> You need Node.js >= 20 for the MCP proxy.
 > - **nvm**: `nvm install 20`
 > - **Direct**: download from https://nodejs.org
 
-Record the **full absolute path** to `npx` (e.g. `/Users/me/.nvm/versions/node/v20.20.1/bin/npx`).
-Also record the `bin` directory for the `PATH` env var.
+Record the **full absolute path** to `node` (e.g. `/Users/me/.nvm/versions/node/v20.20.1/bin/node`).
 
 ---
 
 ### Step 3 — Write MCP config
 
-Register the WrenAI MCP server using the Claude Code CLI.
+Write the following JSON to `.mcp.json` in the **project root**.
 
-> **Note:** Claude Code's native HTTP transport has a known bug (#29688).
-> Use the stdio bridge workaround below until it's fixed.
+If the file already exists with other servers, **merge** — don't overwrite.
 
-**Step 1 — Generate an API key** in WrenAI project settings if you don't have one.
+> **Note:** Claude Code's native HTTP transport auto-discovers OAuth and gets stuck
+> if the server advertises `/.well-known/oauth-authorization-server`.
+> Use the stdio proxy (`mcp-proxy.mjs`) to bypass this.
 
-**Step 2 — Run this command:**
+**Step 3a — Locate the proxy**
+
+The `mcp-proxy.mjs` file ships with this plugin. Find its absolute path:
 
 ```bash
-claude mcp add --transport stdio --scope project wrenai -- \
-  npx mcp-remote <endpoint_url> \
-  --header "Authorization: Bearer <api_key>"
+# If installed as a plugin, it's in the plugin directory:
+ls "$(pwd)/mcp-proxy.mjs" 2>/dev/null || echo "Not found in current dir"
+```
+
+**Step 3b — Write `.mcp.json`**
+
+**Without auth (local dev):**
+```json
+{
+  "mcpServers": {
+    "wrenai": {
+      "type": "stdio",
+      "command": "<node_path>",
+      "args": [
+        "<absolute_path_to>/mcp-proxy.mjs",
+        "<endpoint_url>"
+      ]
+    }
+  }
+}
+```
+
+**With API key:**
+```json
+{
+  "mcpServers": {
+    "wrenai": {
+      "type": "stdio",
+      "command": "<node_path>",
+      "args": [
+        "<absolute_path_to>/mcp-proxy.mjs",
+        "<endpoint_url>",
+        "<api_key>"
+      ]
+    }
+  }
+}
 ```
 
 For example:
-```bash
-claude mcp add --transport stdio --scope project wrenai -- \
-  npx mcp-remote https://app.getwren.ai/api/mcp/123 \
-  --header "Authorization: Bearer sk-abc123"
+```json
+{
+  "mcpServers": {
+    "wrenai": {
+      "type": "stdio",
+      "command": "/Users/me/.nvm/versions/node/v20.20.1/bin/node",
+      "args": [
+        "/Users/me/wrenai-mcp/mcp-proxy.mjs",
+        "https://app.getwren.ai/api/mcp/123",
+        "sk-abc123"
+      ]
+    }
+  }
+}
 ```
 
-**Step 3 — Restart Claude Code** to activate the connection.
-
-**Scope options:**
-- `project` (recommended) — shared with teammates via `.mcp.json`
-- `local` — only you, only this project
-- `user` — available across all your projects
-
-**IMPORTANT:** Do NOT use `--transport http` directly — it has a known bug (#29688) that prevents MCP session establishment. The stdio bridge via `mcp-remote` is the workaround.
+**IMPORTANT:** Do NOT use `--transport http` or `type: "http"` — Claude Code's HTTP transport auto-discovers OAuth endpoints and fails if the server exposes one. The stdio proxy bypasses this entirely.
 
 ---
 
@@ -98,8 +137,8 @@ Tell the user:
 > WrenAI MCP config written to `.mcp.json`.
 >
 > **Next steps:**
-> 1. Restart Claude Code (or run `/mcp` → Reconnect) to activate the connection
-> 2. After reconnecting, try: `/wrenai-analyst how many records do I have?`
+> 1. **Restart Claude Code** to activate the connection (config changes require a restart)
+> 2. After restarting, try: `/wrenai-analyst how many records do I have?`
 >
 > The `wrenai-analyst` skill is available for data analysis, SQL generation, and charting.
 
@@ -111,12 +150,12 @@ If the connection fails:
 
 | Issue | Fix |
 |-------|-----|
-| "Does not adhere to MCP server configuration schema" | Must use `command`/`args` format, not `type: streamable-http` |
-| "Failed to reconnect" | Fully restart the agent |
+| "Failed to reconnect" | Fully restart the agent — `/mcp` reconnect uses cached config |
 | 401 Unauthorized | Check API key, or set `MCP_SKIP_AUTH=true` on the WrenAI server |
-| Node.js version error | `mcp-remote` needs Node >= 20 — check the `command` path |
+| Node.js version error | The proxy needs Node >= 20 — check the `command` path |
 | Connection refused | Verify WrenAI is running at the specified URL |
-| "Authentication successful but reconnection failed" | Restart the agent completely |
+| OAuth timeout (HTTP transport) | Do NOT use `type: "http"` — use the stdio proxy to bypass OAuth discovery |
+| "Token expired without refresh token" | Remove any stale server config from `~/.claude.json` with `claude mcp remove wrenai -s local` |
 
 ---
 
@@ -126,4 +165,5 @@ The same config works for Claude Desktop. The config file location:
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-Use the same `command`/`args`/`env` structure as `.mcp.json`.
+Use the same `command`/`args` structure as `.mcp.json`. The `mcp-proxy.mjs` path
+must be absolute.
