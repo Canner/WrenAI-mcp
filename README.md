@@ -15,68 +15,35 @@ AI Agent ←→ MCP ←→ WrenAI Server
 ## Requirements
 
 - A running WrenAI instance with MCP enabled
-- **Web platforms** (claude.ai, ChatGPT): just your WrenAI account (OAuth login)
-- **CLI / code editors** (Claude Code, Claude Desktop): Node.js >= 20 for the stdio proxy + API key
+- **Web / desktop** (claude.ai, Claude Desktop, ChatGPT): just your WrenAI account (OAuth login)
+- **CLI** (Claude Code): Node.js >= 20 for the stdio proxy + API key
 
 ---
 
 ## Install by Platform
 
-### 1. claude.ai (Web)
+### 1. claude.ai (Web) and Claude Desktop(chat/cowork/code)
 
 Add MCP connector + create skill. Auth is handled via OAuth.
 
 **Step 1 — Add MCP Connector:**
 
-1. Go to **Settings → Connectors → Go to Customize -> click + icon -> add custom connector**
-2. Name: `wrenai`
-3. URL: `https://app.getwren.ai/api/mcp/{your_project_id}`
+1. Go to **Customize → Connectors → Add custom connector**
+2. Give a name to your mcp
+3. URL: Copy your project MCP url in wrenai. 
 4. Auth: OAuth (you'll be redirected to log in with your WrenAI account)
 
 **Step 2 — Upload Skill:**
 
-1. Go to **Settings → Skills → Upload Skill**
+1. Open a **Customize → Skills → Create a skill → Upload a skill**
 2. Upload `web/claude/wrenai-analyst/SKILL.md`
 
 > Generate the skill files locally: `git clone https://github.com/canner/wrenai-mcp.git && cd wrenai-mcp && ./setup --host web`
 
 ---
 
-### 2. Claude Desktop
 
-**2 steps.** Edit MCP config + add skill to project. Uses the stdio proxy to bypass OAuth discovery.
-
-**Step 1 — Add MCP Server:**
-
-Clone the plugin: `git clone https://github.com/canner/wrenai-mcp.git`
-
-Edit `claude_desktop_config.json`:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "wrenai": {
-      "command": "{node_path}",
-      "args": [
-        "{absolute_path_to_repo}/mcp-proxy.mjs",
-        "https://app.getwren.ai/api/mcp/{your_project_id}",
-        "{your_api_key}"
-      ]
-    }
-  }
-}
-```
-
-**Step 2 — Add Skill:**
-
-1. Open a **Project → Project Knowledge → Upload Skill**
-2. Upload `web/claude/wrenai-analyst/SKILL.md`
-
----
-
-### 3. Claude Code (CLI)
+### 2. Claude Code (CLI)
 
 > **Note:** Claude Code's HTTP transport auto-discovers OAuth and hangs if the server
 > advertises `/.well-known/oauth-authorization-server`. The stdio proxy bypasses this.
@@ -117,7 +84,7 @@ Done. Try `/wrenai-analyst tell me about my data`
 
 ---
 
-### 4. ChatGPT
+### 3. ChatGPT
 
 Add MCP connector + set up custom instructions. Auth is handled via OAuth.
 
@@ -153,7 +120,7 @@ Add MCP connector + set up custom instructions. Auth is handled via OAuth.
 | Platform | MCP Setup | Skill Setup | Steps |
 |----------|-----------|-------------|-------|
 | **claude.ai** | Connectors UI (OAuth) | Skills UI (paste content) | 2 |
-| **Claude Desktop** | Edit `claude_desktop_config.json` (stdio proxy) | Project Knowledge | 2 |
+| **Claude Desktop** | Integrations UI (OAuth) | Project Knowledge | 2 |
 | **Claude Code** | `.mcp.json` (stdio proxy + API key) | Plugin: `/install canner/wrenai-mcp` | 3 |
 | **ChatGPT** | Developer Mode → Add MCP Connector | Custom Instructions (paste content) | 2 |
 
