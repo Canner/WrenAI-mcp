@@ -48,37 +48,40 @@ Add MCP connector + create skill. Auth is handled via OAuth.
 > **Note:** Claude Code's HTTP transport auto-discovers OAuth and hangs if the server
 > advertises `/.well-known/oauth-authorization-server`. The stdio proxy bypasses this.
 
+**Step 1 — Clone the plugin:**
+
 ```bash
-# Step 1: Clone the plugin
 git clone https://github.com/canner/wrenai-mcp.git
 cd wrenai-mcp
-
-# Step 2: Add MCP server (stdio proxy with API key)
-#   Replace {node_path} with your Node.js >= 20 binary (e.g. ~/.nvm/versions/node/v20.20.1/bin/node)
-#   Replace {your_project_id} and {your_api_key} with your WrenAI credentials
-cat > .mcp.json << 'EOF'
-{
-  "mcpServers": {
-    "wrenai": {
-      "type": "stdio",
-      "command": "{node_path}",
-      "args": [
-        "{absolute_path_to_repo}/mcp-proxy.mjs",
-        "https://app.getwren.ai/api/mcp/{your_project_id}",
-        "{your_api_key}"
-      ]
-    }
-  }
-}
-EOF
-
-# Step 3: Restart Claude Code
-
-# Step 4 (optional): Install the data analyst skill plugin
-/install canner/wrenai-mcp
 ```
 
-Generate an API key in your [WrenAI project settings](https://app.getwren.ai).
+**Step 2 — Generate an API key:**
+
+Go to [WrenAI](https://cloud.getwren.ai/) → **API → API keys → Create new API key**. Copy the key for the next step.
+
+**Step 3 — Add MCP server:**
+
+```bash
+# Replace {your_project_id} and {your_api_key} with your WrenAI credentials
+
+# Global (available in all projects):
+claude mcp add wrenai --scope user -t stdio -- \
+  $(which node) $(pwd)/mcp-proxy.mjs \
+  https://app.getwren.ai/api/mcp/{your_project_id} {your_api_key}
+
+# Or project-only (available only in current project):
+claude mcp add wrenai --scope project -t stdio -- \
+  $(which node) $(pwd)/mcp-proxy.mjs \
+  https://app.getwren.ai/api/mcp/{your_project_id} {your_api_key}
+```
+
+> Requires Node.js >= 20. Check with `node --version`.
+
+**Step 4 (optional) — Install the data analyst skill plugin:**
+
+```
+/install canner/wrenai-mcp
+```
 
 Done. Try `/wrenai-analyst tell me about my data`
 
@@ -121,7 +124,7 @@ Add MCP connector + set up custom instructions. Auth is handled via OAuth.
 |----------|-----------|-------------|-------|
 | **claude.ai** | Connectors UI (OAuth) | Skills UI (paste content) | 2 |
 | **Claude Desktop** | Integrations UI (OAuth) | Project Knowledge | 2 |
-| **Claude Code** | `.mcp.json` (stdio proxy + API key) | Plugin: `/install canner/wrenai-mcp` | 3 |
+| **Claude Code** | `claude mcp add` (stdio proxy + API key) | Plugin: `/install canner/wrenai-mcp` | 3 |
 | **ChatGPT** | Developer Mode → Add MCP Connector | Custom Instructions (paste content) | 2 |
 
 ## Add to your repo (optional)
