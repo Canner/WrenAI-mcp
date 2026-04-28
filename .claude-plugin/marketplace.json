@@ -1,0 +1,17 @@
+{
+  "name": "wrenai-mcp",
+  "owner": {
+    "name": "Canner"
+  },
+  "metadata": {
+    "description": "Connect AI agents to WrenAI — query data, generate SQL, build charts, and get business insights via MCP",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "wrenai-mcp",
+      "description": "WrenAI MCP plugin — data analyst skills for SQL, charts, and business insights",
+      "source": "./"
+    }
+  ]
+}
