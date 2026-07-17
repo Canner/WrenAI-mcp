@@ -1,112 +1,143 @@
-# WrenAI MCP Plugin
+# WrenAI MCP
 
-Connect AI agents to [WrenAI](https://getwren.ai) — query your data, generate SQL, build charts, and get business insights using natural language.
+Connect AI agents to [WrenAI](https://getwren.ai) — query your data, generate SQL, build charts, and get business insights in natural language, straight from Claude or ChatGPT.
 
 ```
-AI Agent ←→ MCP ←→ WrenAI Server
-                    ├── get_project_metadata
-                    ├── ask (end-to-end Q&A)
-                    ├── generate_sql
-                    ├── run_sql
-                    ├── generate_chart (VegaSpec)
-                    └── generate_summary
+AI client (Claude / ChatGPT)
+   │  OAuth
+   ▼
+https://cloud.getwren.ai/api/mcp          ← one endpoint for your whole org
+   ├── list_projects            (discover which projects you can query)
+   ├── get_project_metadata     (table schema for a project)
+   ├── ask                      (end-to-end natural-language Q&A)
+   ├── generate_sql / run_sql
+   ├── generate_chart           (Vega spec)
+   └── generate_summary
 ```
+
+> **New model (July 2026):** MCP is now a **single organization-level endpoint** with **OAuth** login — no API key and no local proxy. After you connect, your agent calls `list_projects` and then works against any project your org has exposed. The old per-project URL (`…/api/mcp/{token}`) is **deprecated** — see [Migrating](#migrating-from-the-per-project-url).
+
+---
+
+## How it works
+
+1. An **org admin** enables MCP for the organization and picks which projects are **exposed**.
+2. You add **one URL** — `https://cloud.getwren.ai/api/mcp` — as an MCP connector in your AI client and log in with **OAuth** (your WrenAI account).
+3. Your agent calls **`list_projects`** to see the projects you can reach, then passes a **`projectId`** to the other tools.
+4. Data security (row/column-level) is applied **per user**, server-side — you only see what your WrenAI account is allowed to see.
 
 ## Requirements
 
-- A running WrenAI instance with MCP enabled
-- **Web / desktop** (claude.ai, Claude Desktop, ChatGPT): just your WrenAI account (OAuth login)
-- **CLI** (Claude Code): Node.js >= 18 for the stdio proxy + WrenAI API key
+- A WrenAI **Enterprise** plan (MCP is an Enterprise feature).
+- An **org admin** to enable MCP + expose projects (one-time, below).
+- Your own WrenAI account (for the OAuth login). **No API key, no proxy.**
 
 ---
 
-## Install by Platform
+## Part 1 · Admin: enable MCP for your organization
 
-### 1. claude.ai (Web) and Claude Desktop(chat/cowork/code)
+*(One-time, done by an organization admin.)*
 
-Add MCP connector + create skill. Auth is handled via OAuth.
+1. In WrenAI, go to **Settings → Organization → MCP**.
+2. Turn on **Enable MCP for this organization**.
+3. Under **Exposed projects**, toggle **Exposed** on for each project you want reachable over MCP. Optionally set **New projects default** to *Exposed*.
+4. Copy the **endpoint URL** shown here — it's the same for everyone in the org:
+   `https://cloud.getwren.ai/api/mcp`
 
-**Step 1 — Add MCP Connector:**
-
-1. Go to **Customize → Connectors → Add custom connector**
-2. Give a name to your mcp
-3. URL: Copy your project MCP url in wrenai. 
-4. Auth: OAuth (you'll be redirected to log in with your WrenAI account)
-
-**Step 2 — Upload Skill:**
-
-1. Open a **Customize → Skills → Create a skill → Upload a skill**
-2. Upload `web/claude/wrenai-analyst/SKILL.md`
-
-> Generate the skill files locally: `git clone https://github.com/canner/wrenai-mcp.git && cd wrenai-mcp && ./setup --host web`
+> Only exposed projects are reachable, and each user still only sees projects they’re a member of. Toggling a project off here (or disabling the org switch) immediately cuts MCP access to it.
 
 ---
 
+## Part 2 · Connect your AI client
 
-### 2. Claude Code (CLI)
+You only need the endpoint URL and your WrenAI login. Pick your client:
 
-Clone the repo, run the installer, and install the skill plugin:
+### claude.ai (Web) & Claude Desktop
+
+1. **Settings → Connectors → Add custom connector**.
+2. **Name:** `WrenAI`  ·  **URL:** `https://cloud.getwren.ai/api/mcp`
+3. **Connect** → you’ll be redirected to log in with your WrenAI account (OAuth). Approve access.
+
+### ChatGPT
+
+*(Requires connector/Developer-Mode access on your ChatGPT plan; exact menu names vary by version.)*
+
+1. Open **Plugins → Connectors** and start a new connector (**New Plugin**).
+2. **Name:** `WrenAI`. Keep **Connection: Server URL** and enter `https://cloud.getwren.ai/api/mcp`.
+3. **Authentication:** OAuth → tick **“I understand and want to continue”** → **Create**.
+4. Log in with your WrenAI account when prompted.
+
+### Claude Code (CLI)
 
 ```bash
-git clone https://github.com/canner/wrenai-mcp.git
-cd wrenai-mcp
-./install.sh
-claude plugin marketplace add ./
-claude plugin install wrenai-mcp
+claude mcp add --transport http wrenai https://cloud.getwren.ai/api/mcp
+# then, inside Claude Code:
+/mcp        # select "wrenai" and complete the OAuth login in your browser
 ```
 
-> You'll need your **MCP URL** and **API key** from [WrenAI](https://cloud.getwren.ai/) → **Settings → API**.
+No proxy and no API key — you connect to the remote endpoint and authenticate via OAuth.
 
-Done. Restart Claude Code and try `/wrenai-analyst tell me about my data`
+> If `/mcp` hangs at the OAuth step, update Claude Code to the latest version and retry (older versions don't fully support remote OAuth MCP servers). Please open an issue here if it persists.
+
+### Self-hosted WrenAI
+
+Use your own instance’s origin instead of `cloud.getwren.ai`, e.g. `https://wren.yourcompany.com/api/mcp`. Everything else is identical.
 
 ---
 
-### 3. ChatGPT
+## Part 3 · Using it
 
-Add MCP connector + set up custom instructions. Auth is handled via OAuth.
+Once connected, just ask in natural language. Behind the scenes the agent:
 
-**Step 1 — Enable Developer Mode & Add MCP Connector:**
+1. calls **`list_projects`** → picks the right `projectId`,
+2. reads schema with **`get_project_metadata`**,
+3. answers with **`ask`** (or `generate_sql` / `run_sql`), and renders a **`generate_chart`** visualization.
 
-1. Go to **Settings → Apps & Connectors → Advanced settings**
-2. Enable **Developer Mode**
-3. Back to **Apps & Connectors**, click **Add** → **Add MCP server**
-4. Name: `wrenai`
-5. URL: `https://app.getwren.ai/api/mcp/{your_project_id}`
-6. Auth: OAuth (you'll be redirected to log in with your WrenAI account)
+Example prompts:
+- “List my WrenAI projects.”
+- “In the *Sales* project, what were the top 5 products by revenue last quarter? Chart it.”
 
-**Step 2 — Add Custom Instructions:**
+> **Multiple orgs?** If your account belongs to more than one MCP-enabled org, `list_projects` shows the exposed projects across all of them.
 
-1. Go to **Settings → Personalization → Custom Instructions**
-2. Paste the content from [`web/chatgpt/wrenai-analyst-skill.md`](./web/chatgpt/wrenai-analyst-skill.md)
+### Optional: the WrenAI Analyst skill
 
-> Generate the skill content locally: `git clone https://github.com/canner/wrenai-mcp.git && cd wrenai-mcp && ./setup --host chatgpt`
->
-> See [ChatGPT Developer Mode & MCP docs](https://help.openai.com/en/articles/12584461-developer-mode-apps-and-full-mcp-connectors-in-chatgpt-beta) for details.
+For sharper analysis behavior, install the **`wrenai-analyst`** skill:
+
+| Client | How |
+|---|---|
+| claude.ai / Desktop | **Customize → Skills → Create → Upload** `web/claude/wrenai-analyst/SKILL.md` |
+| ChatGPT | Paste `web/chatgpt/wrenai-analyst-skill.md` into **Custom Instructions** |
+| Claude Code | `claude plugin marketplace add ./ && claude plugin install wrenai-mcp` |
+
+> Generate the skill files: `git clone https://github.com/canner/wrenai-mcp.git && cd wrenai-mcp && ./setup --host web` (or `--host chatgpt`).
 
 ---
 
-## Skills
+## Tools
 
-| Skill | Description |
-|-------|-------------|
-| `setup-wrenai-mcp` | One-time setup — connects your agent to a WrenAI instance |
-| `wrenai-analyst` | Data analyst — SQL, charts, insights from natural language |
+| Tool | Purpose | Takes `projectId` |
+|---|---|---|
+| `list_projects` | Projects you can query | — |
+| `get_project_metadata` | Table schema for a project | ✅ |
+| `ask` | End-to-end natural-language Q&A | ✅ |
+| `generate_sql` | Question → SQL | ✅ |
+| `run_sql` | Execute SQL | ✅ |
+| `generate_chart` | Vega chart spec | ✅ |
+| `generate_summary` | Summarize results | ✅ |
 
-## Platform Summary
+## Data security & limits
 
-| Platform | MCP Setup | Skill Setup | Steps |
-|----------|-----------|-------------|-------|
-| **claude.ai** | Connectors UI (OAuth) | Skills UI (paste content) | 2 |
-| **Claude Desktop** | Integrations UI (OAuth) | Project Knowledge | 2 |
-| **Claude Code** | `./install.sh` (auto-configures stdio proxy + API key) | `claude plugin marketplace add ./` + `claude plugin install wrenai-mcp` | 2 |
-| **ChatGPT** | Developer Mode → Add MCP Connector | Custom Instructions (paste content) | 2 |
+- **Per-user RLS/CLS** — row/column policies are resolved server-side from the **Wren AI account that authenticated the connection** (the OAuth user); the client can’t override them. ⚠️ **Avoid shared accounts** — anyone using a shared Wren AI account inherits that account’s data permissions, so RLS/CLS can’t tell the individuals apart. Have each person connect with their own account.
+- **Enterprise-only.**
+- **Interactive mode only** — Agentic Mode is not available over MCP.
 
-## Add to your repo (optional)
+---
 
-Let teammates use the skills without installing:
+## Migrating from the per-project URL
 
-```bash
-# For Claude Code — clone into project and configure .mcp.json
-git clone https://github.com/canner/wrenai-mcp.git .claude/plugins/wrenai-mcp
-# Then add the .mcp.json config as shown in section 3 above
-```
+The legacy per-project URL — `https://cloud.getwren.ai/api/mcp/{token}` — and its **Settings → Project → MCP connection** page are **deprecated and will be removed soon**. To migrate:
+
+1. Have an admin enable MCP + expose the project in **Settings → Organization → MCP** (Part 1).
+2. In your AI client, replace the old per-project URL with `https://cloud.getwren.ai/api/mcp` and reconnect (Part 2).
+3. Your agent now picks the project via `list_projects` instead of the URL.
+
