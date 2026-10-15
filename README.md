@@ -24,11 +24,11 @@ https://cloud.getwren.ai/api/mcp          ← one endpoint for your whole org
 1. An **org admin** enables MCP for the organization and picks which projects are **exposed**.
 2. You add **one URL** — `https://cloud.getwren.ai/api/mcp` — as an MCP connector in your AI client and log in with **OAuth** (your WrenAI account).
 3. Your agent calls **`list_projects`** to see the projects you can reach, then passes a **`projectId`** to the other tools.
-4. Data security (row/column-level) is applied **per user**, server-side — you only see what your WrenAI account is allowed to see.
+4. If your organization uses row/column-level data security (an **Enterprise** feature), it's applied **per user**, server-side — you only see what your WrenAI account is allowed to see.
 
 ## Requirements
 
-- A WrenAI **Enterprise** plan (MCP is an Enterprise feature).
+- A WrenAI **Essential** or **Enterprise** plan.
 - An **org admin** to enable MCP + expose projects (one-time, below).
 - Your own WrenAI account (for the OAuth login). **No API key, no proxy.**
 
@@ -127,8 +127,8 @@ For sharper analysis behavior, install the **`wrenai-analyst`** skill:
 
 ## Data security & limits
 
-- **Per-user RLS/CLS** — row/column policies are resolved server-side from the **Wren AI account that authenticated the connection** (the OAuth user); the client can’t override them. ⚠️ **Avoid shared accounts** — anyone using a shared Wren AI account inherits that account’s data permissions, so RLS/CLS can’t tell the individuals apart. Have each person connect with their own account.
-- **Enterprise-only.**
+- **Per-user RLS/CLS** *(Enterprise feature)* — row/column policies are resolved server-side from the **Wren AI account that authenticated the connection** (the OAuth user); the client can’t override them. ⚠️ **Avoid shared accounts** — anyone using a shared Wren AI account inherits that account’s data permissions, so RLS/CLS can’t tell the individuals apart. Have each person connect with their own account.
+- **MCP availability** — available on Essential and Enterprise plans.
 - **Interactive mode only** — Agentic Mode is not available over MCP.
 
 ---
