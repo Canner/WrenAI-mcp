@@ -30,12 +30,23 @@ fi
 # ─── Step 1: Node.js ────────────────────────────────────────────
 printf "  ${BOLD}[1/4] Checking Node.js ...${NC}\n"
 
-# First release on each supported line with the October 2026 security fixes, oldest line first.
+# First patched release on each supported line, oldest line first. Update all three on the next advisory.
 NODE_PATCHED="22.23.4 24.22.1 26.12.1"
+NODE_ADVISORY="October 2026"
+NODE_ADVISORY_URL="https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
 
 # "22.23.4+, 24.22.1+, or 26.12.1+"
-NODE_PATCHED_LIST="${NODE_PATCHED// /+, }+"
-NODE_PATCHED_LIST="${NODE_PATCHED_LIST%, *}, or ${NODE_PATCHED_LIST##*, }"
+NODE_PATCHED_LIST=""
+node_patched_count=$(echo $NODE_PATCHED | wc -w)
+node_patched_i=0
+for v in $NODE_PATCHED; do
+  node_patched_i=$((node_patched_i + 1))
+  if [ "$node_patched_i" -eq 1 ]; then NODE_PATCHED_LIST="$v+"
+  elif [ "$node_patched_i" -lt "$node_patched_count" ]; then NODE_PATCHED_LIST="$NODE_PATCHED_LIST, $v+"
+  elif [ "$node_patched_count" -eq 2 ]; then NODE_PATCHED_LIST="$NODE_PATCHED_LIST or $v+"
+  else NODE_PATCHED_LIST="$NODE_PATCHED_LIST, or $v+"
+  fi
+done
 
 # 24.22.1 -> 24022001
 version_num() {
@@ -45,7 +56,7 @@ version_num() {
   echo $(( 10#${major:-0} * 1000000 + 10#${minor:-0} * 1000 + 10#${patch:-0} ))
 }
 
-# Succeeds when the version has the October 2026 security fixes.
+# Succeeds when the version is at or above its line's NODE_PATCHED floor.
 node_has_security_fixes() {
   local have major floor fix newest="${NODE_PATCHED##* }" release="${1%%+*}"
   have=$(version_num "$1")
@@ -68,8 +79,8 @@ if command -v node &>/dev/null; then
     NODE_CMD=$(command -v node)
     info "Node.js v${NODE_VERSION} — ${DIM}${NODE_CMD}${NC}"
     if ! node_has_security_fixes "$NODE_VERSION"; then
-      warn "Node.js v${NODE_VERSION} lacks the October 2026 security fixes. Upgrade to ${NODE_PATCHED_LIST}.
-    https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      warn "Node.js v${NODE_VERSION} lacks the ${NODE_ADVISORY} security fixes. Upgrade to ${NODE_PATCHED_LIST}.
+    ${NODE_ADVISORY_URL}"
     fi
   else
     fail "Node.js v${NODE_VERSION} found but >= 18 is required.
