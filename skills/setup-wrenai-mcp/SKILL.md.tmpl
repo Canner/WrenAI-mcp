@@ -38,14 +38,11 @@ The stdio proxy requires Node.js >= 20 (for native `https` module ESM support). 
 node --version
 ```
 
-If not found, version < 20, or unpatched (see below), search common locations:
+If not found or version < 20, search common locations:
 - `~/.nvm/versions/node/v2*/bin/node`
 - `~/.volta/bin/node`
 - `/usr/local/bin/node`
 - `/opt/homebrew/bin/node`
-
-Patched minimums: **22.23.4+, 24.22.1+, or 26.12.1+** (or a newer line). Older builds lack the security fixes from the [October 2026 Node.js security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases), and Node 20 gets no fix. Prefer a patched `node` from any of these locations. If every one found is >= 20 but unpatched (an older 22, 24, or 26 build, or a line with no fix such as 20, 23, or 25), continue with the newest and warn the user (do not block):
-> Node.js vX.Y.Z lacks the October 2026 security fixes. Upgrade to 22.23.4+, 24.22.1+, or 26.12.1+.
 
 If no Node.js >= 20 found, offer to install:
 > You need Node.js >= 20 for the MCP proxy.
@@ -78,7 +75,7 @@ If the connection fails:
 |-------|-----|
 | "Failed to reconnect" | Fully restart the agent — `/mcp` reconnect uses cached config |
 | 401 Unauthorized | Check API key, or set `MCP_SKIP_AUTH=true` on the WrenAI server |
-| Node.js version error | The proxy needs Node >= 20, ideally a patched 22.23.4+, 24.22.1+, or 26.12.1+ (October 2026 Node.js security release) — check the `command` path |
+| Node.js version error | The proxy needs Node >= 20 — check the `command` path |
 | Connection refused | Verify WrenAI is running at the specified URL |
 | OAuth timeout (HTTP transport) | Do NOT use `type: "http"` — use the stdio proxy to bypass OAuth discovery |
 | "Token expired without refresh token" | Remove any stale server config from `~/.claude.json` with `claude mcp remove wrenai -s local` |
