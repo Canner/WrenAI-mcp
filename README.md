@@ -141,3 +141,5 @@ The legacy per-project URL — `https://cloud.getwren.ai/api/mcp/{token}` — an
 2. In your AI client, replace the old per-project URL with `https://cloud.getwren.ai/api/mcp` and reconnect (Part 2).
 3. Your agent now picks the project via `list_projects` instead of the URL.
 
+Migrating also removes the need for a local Node.js. Until you migrate, run the legacy stdio proxy (`install.sh`) on Node.js **22.23.4+**, **24.22.1+**, or **26.12.1+**. Older builds of those lines, and the lines with no fix (18, 20, 23, 25), lack the fixes from the [October 2026 Node.js security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+

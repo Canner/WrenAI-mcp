@@ -56,7 +56,7 @@ For example:
   "mcpServers": {
     "wrenai": {
       "type": "stdio",
-      "command": "/Users/me/.nvm/versions/node/v20.20.1/bin/node",
+      "command": "/Users/me/.nvm/versions/node/v24.22.1/bin/node",
       "args": [
         "/Users/me/wrenai-mcp/mcp-proxy.mjs",
         "https://app.getwren.ai/api/mcp/123",
