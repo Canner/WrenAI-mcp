@@ -202,6 +202,8 @@ If `generate_chart` returns a **VegaSpec** (Vega-Lite JSON), render it as a stan
 
 ### Step 6 — Record the user's verdict
 
+Skip this step if the `submit_feedback` tool isn't available on the connected server.
+
 When the user says a result is wrong, gives a corrected value, filter or definition, or asks you to
 "flag" or "report" it, call `submit_feedback` with rating `down`; when they say it is right or useful,
 use `up`. Pass the `answerId` of the call that produced it — don't ask them to confirm first. Use

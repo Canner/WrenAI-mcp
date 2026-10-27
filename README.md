@@ -125,7 +125,7 @@ For sharper analysis behavior, install the **`wrenai-analyst`** skill:
 | `run_sql` | Execute SQL | ✅ |
 | `generate_chart` | Vega chart spec | ✅ |
 | `generate_summary` | Summarize results | ✅ |
-| `submit_feedback` | Record whether an answer was right or wrong | ✅ |
+| `submit_feedback` | Record whether an answer was right or wrong (coming soon to WrenAI Cloud) | ✅ |
 
 ## Data security & limits
 
