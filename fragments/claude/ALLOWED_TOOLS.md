@@ -5,6 +5,7 @@ allowed-tools:
   - mcp__wrenai__run_sql
   - mcp__wrenai__generate_chart
   - mcp__wrenai__generate_summary
+  - mcp__wrenai__submit_feedback
   - Read
   - Write
   - Bash
