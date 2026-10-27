@@ -106,7 +106,7 @@ after `respond_clarification` is rated under the `answerId` the original `ask` r
 | `comment` | no | Anything else the user said about the result, in their own words |
 | `correction` | no | What the user says the right answer is, in their own words |
 | `topics` | no | Categories that clearly match the complaint; leave empty when unsure |
-| `relatedAnswerIds` | no | Other `answerId`s whose results you combined into the same reply |
+| `relatedAnswerIds` | no | Other `answerId`s whose results you combined into the same reply (not `answerId` itself) |
 
 ---
 
@@ -217,10 +217,10 @@ If `generate_chart` returns a **VegaSpec** (Vega-Lite JSON), render it as a stan
 
 When the user says a result is wrong, gives a corrected value, filter or definition, or asks you to
 "flag" or "report" it, call `submit_feedback` with rating `down`; when they say it is right or useful,
-use `up`. Pass the `answerId` of the call that produced it — don't ask them to confirm first. Use their own words
-for `comment` and `correction`; never rate from your own judgment, and don't treat a bare "thanks"
-or a new question as a verdict. If you can't tell which result they mean, ask. Send one call per
-verdict: a report can't be withdrawn, and a changed verdict is recorded as a new one.
+use `up`. Pass the `answerId` of the call that produced it — don't ask them to confirm first. Use
+their own words for `comment` and `correction`; never rate from your own judgment, and don't treat
+a bare "thanks" or a new question as a verdict. If you can't tell which result they mean, ask. Send
+one call per verdict: a report can't be withdrawn, and a changed verdict is recorded as a new one.
 
 After it succeeds, say in one short sentence that the feedback was recorded — don't promise a fix.
 If the verdict was "down" and you can get a better answer, call `ask` again.
