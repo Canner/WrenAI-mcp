@@ -48,10 +48,10 @@ If not found or version < 20, search common locations:
 
 If no Node.js >= 20 found, offer to install:
 > You need Node.js >= 20 for the MCP proxy.
-> - **nvm**: `nvm install 20`
+> - **nvm**: `nvm install 24`
 > - **Direct**: download from https://nodejs.org
 
-Record the **full absolute path** to `node` (e.g. `/Users/me/.nvm/versions/node/v20.20.1/bin/node`).
+Record the **full absolute path** to `node` (e.g. `/Users/me/.nvm/versions/node/v24.22.1/bin/node`).
 
 ---
 
@@ -115,7 +115,7 @@ For example:
   "mcpServers": {
     "wrenai": {
       "type": "stdio",
-      "command": "/Users/me/.nvm/versions/node/v20.20.1/bin/node",
+      "command": "/Users/me/.nvm/versions/node/v24.22.1/bin/node",
       "args": [
         "/Users/me/wrenai-mcp/mcp-proxy.mjs",
         "https://app.getwren.ai/api/mcp/123",

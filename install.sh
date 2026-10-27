@@ -30,6 +30,47 @@ fi
 # ─── Step 1: Node.js ────────────────────────────────────────────
 printf "  ${BOLD}[1/4] Checking Node.js ...${NC}\n"
 
+# First patched release on each supported line, oldest line first. Update all three on the next advisory.
+NODE_PATCHED="22.23.4 24.22.1 26.12.1"
+NODE_ADVISORY="October 2026"
+NODE_ADVISORY_URL="https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+
+# "22.23.4+, 24.22.1+, or 26.12.1+"
+NODE_PATCHED_LIST=""
+node_patched_count=$(echo $NODE_PATCHED | wc -w)
+node_patched_i=0
+for v in $NODE_PATCHED; do
+  node_patched_i=$((node_patched_i + 1))
+  if [ "$node_patched_i" -eq 1 ]; then NODE_PATCHED_LIST="$v+"
+  elif [ "$node_patched_i" -lt "$node_patched_count" ]; then NODE_PATCHED_LIST="$NODE_PATCHED_LIST, $v+"
+  elif [ "$node_patched_count" -eq 2 ]; then NODE_PATCHED_LIST="$NODE_PATCHED_LIST or $v+"
+  else NODE_PATCHED_LIST="$NODE_PATCHED_LIST, or $v+"
+  fi
+done
+
+# 24.22.1 -> 24022001
+version_num() {
+  local major minor patch
+  IFS=. read -r major minor patch _ <<< "${1%%[-+]*}"
+  major=${major//[^0-9]/} minor=${minor//[^0-9]/} patch=${patch//[^0-9]/}
+  echo $(( 10#${major:-0} * 1000000 + 10#${minor:-0} * 1000 + 10#${patch:-0} ))
+}
+
+# Succeeds when the version is at or above its line's NODE_PATCHED floor.
+node_has_security_fixes() {
+  local have major floor fix newest="${NODE_PATCHED##* }" release="${1%%+*}"
+  have=$(version_num "$1")
+  major=$(( have / 1000000 ))
+  for floor in $NODE_PATCHED; do
+    [ "$major" -eq "${floor%%.*}" ] || continue
+    fix=$(version_num "$floor")
+    # X.Y.Z-pre sorts before X.Y.Z and lacks the embargoed fixes.
+    [ "$have" -gt "$fix" ] || { [ "$have" -eq "$fix" ] && [ "$release" = "${release%%-*}" ]; }
+    return
+  done
+  [ "$major" -gt "${newest%%.*}" ]
+}
+
 NODE_CMD=""
 if command -v node &>/dev/null; then
   NODE_VERSION=$(node -v | sed 's/v//')
@@ -37,13 +78,17 @@ if command -v node &>/dev/null; then
   if [ "$MAJOR" -ge 18 ]; then
     NODE_CMD=$(command -v node)
     info "Node.js v${NODE_VERSION} — ${DIM}${NODE_CMD}${NC}"
+    if ! node_has_security_fixes "$NODE_VERSION"; then
+      warn "Node.js v${NODE_VERSION} lacks the ${NODE_ADVISORY} security fixes. Upgrade to ${NODE_PATCHED_LIST}.
+    ${NODE_ADVISORY_URL}"
+    fi
   else
     fail "Node.js v${NODE_VERSION} found but >= 18 is required.
-    Install: https://nodejs.org"
+    Install Node.js ${NODE_PATCHED_LIST}: https://nodejs.org"
   fi
 else
   fail "Node.js not found.
-    Install Node.js 18+: https://nodejs.org"
+    Install Node.js ${NODE_PATCHED_LIST}: https://nodejs.org"
 fi
 
 # ─── Step 2: Locate repo ────────────────────────────────────────
