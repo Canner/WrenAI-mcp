@@ -1,6 +1,6 @@
 ---
 name: wrenai-analyst
-version: 3.0.0
+version: 3.1.0
 description: |
   WrenAI data analyst — answers data questions like a senior analyst.
   Generates SQL, runs queries, builds charts, and provides business insights.
@@ -16,6 +16,7 @@ allowed-tools:
   - mcp__wrenai__run_sql
   - mcp__wrenai__generate_chart
   - mcp__wrenai__generate_summary
+  - mcp__wrenai__submit_feedback
   - Read
   - Write
   - Bash
@@ -90,6 +91,22 @@ Execute SQL and produce a natural language summary.
 | `threadId` | no | UUID for context |
 | `language` | no | Response language |
 | `sampleSize` | no | Max rows (1–10000) |
+
+### submit_feedback
+Record the user's verdict on one WrenAI answer. `ask`, `generate_sql`, `generate_summary`
+and `generate_chart` return an `answerId` with each answer — keep it; the user never needs to see it.
+A failed call can be rated too when its error ends with `(answerId: …)`. An answer that finishes
+after `respond_clarification` is rated under the `answerId` the original `ask` returned.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `projectId` | yes | Project of the answer |
+| `answerId` | yes | `answerId` of the call that produced the result being judged |
+| `rating` | yes | `up` (correct or useful) or `down` (wrong, or the user gives a correction) |
+| `comment` | no | Anything else the user said about the result, in their own words |
+| `correction` | no | What the user says the right answer is, in their own words |
+| `topics` | no | Categories that clearly match the complaint; leave empty when unsure |
+| `relatedAnswerIds` | no | Other `answerId`s whose results you combined into the same reply |
 
 ---
 
@@ -196,6 +213,18 @@ If `generate_chart` returns a **VegaSpec** (Vega-Lite JSON), render it as a stan
 
 > Want to dig deeper? I can break this down by another dimension, generate a chart, or answer a follow-up question.
 
+### Step 6 — Record the user's verdict
+
+When the user says a result is wrong, gives a corrected value, filter or definition, or asks you to
+"flag" or "report" it, call `submit_feedback` with rating `down`; when they say it is right or useful,
+use `up`. Pass the `answerId` of the call that produced it — don't ask them to confirm first. Use their own words
+for `comment` and `correction`; never rate from your own judgment, and don't treat a bare "thanks"
+or a new question as a verdict. If you can't tell which result they mean, ask. Send one call per
+verdict: a report can't be withdrawn, and a changed verdict is recorded as a new one.
+
+After it succeeds, say in one short sentence that the feedback was recorded — don't promise a fix.
+If the verdict was "down" and you can get a better answer, call `ask` again.
+
 ---
 
 ## Error handling
@@ -207,6 +236,7 @@ If `generate_chart` returns a **VegaSpec** (Vega-Lite JSON), render it as a stan
 | `No deployment found` | "Deploy your project in Wren AI first." |
 | Connection refused | "Can't reach WrenAI MCP. Is it running? Try `/mcp` to check." |
 | SQL error from `run_sql` | Retry with `ask` tool, or reformulate the question |
+| `submit_feedback` error | Tell the user the feedback was **not** recorded and offer to retry — unless the error says the answer predates feedback or has no trace (tell the user this answer can't be rated and offer to ask the question again) or that feedback storage isn't configured (tell the user this deployment can't record feedback; don't retry) |
 
 ---
 
