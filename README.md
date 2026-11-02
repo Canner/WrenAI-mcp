@@ -12,7 +12,8 @@ https://cloud.getwren.ai/api/mcp          ← one endpoint for your whole org
    ├── ask                      (end-to-end natural-language Q&A)
    ├── generate_sql / run_sql
    ├── generate_chart           (Vega spec)
-   └── generate_summary
+   ├── generate_summary
+   └── submit_feedback          (rate an answer as right or wrong)
 ```
 
 > **New model (July 2026):** MCP is now a **single organization-level endpoint** with **OAuth** login — no API key and no local proxy. After you connect, your agent calls `list_projects` and then works against any project your org has exposed. The old per-project URL (`…/api/mcp/{token}`) is **deprecated** — see [Migrating](#migrating-from-the-per-project-url).
@@ -124,6 +125,7 @@ For sharper analysis behavior, install the **`wrenai-analyst`** skill:
 | `run_sql` | Execute SQL | ✅ |
 | `generate_chart` | Vega chart spec | ✅ |
 | `generate_summary` | Summarize results | ✅ |
+| `submit_feedback` | Record whether an answer was right or wrong (coming soon to WrenAI Cloud) | ✅ |
 
 ## Data security & limits
 
